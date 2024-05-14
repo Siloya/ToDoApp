@@ -22,6 +22,9 @@ class _ToDoListPageState extends State<ToDoListPage> {
   static const String TODO="To Do";
   static const String DOING="Doing";
    static const String DONE="Done";
+  bool _isSearchFieldVisible = false; // Track the visibility of the search field
+  TextEditingController _searchController = TextEditingController();
+  late String searchTerm;
 
   @override
   Widget build(BuildContext context) {
@@ -40,10 +43,14 @@ class _ToDoListPageState extends State<ToDoListPage> {
         backgroundColor: Colors.black,
         actions: [
           IconButton(
-            icon: Icon(Icons.info),
+            icon: Icon(Icons.search),//.info
             color: Color(0xff4e3169),
             onPressed: () {
-              // Show/hide quote banner
+              setState(() {
+                _searchController.text="";
+                searchTerm="";
+                _isSearchFieldVisible = !_isSearchFieldVisible;
+              });
             },
           ),
           IconButton(
@@ -68,11 +75,31 @@ class _ToDoListPageState extends State<ToDoListPage> {
         ),
         child: ListView(
           children: [
+            Visibility(
+              visible: _isSearchFieldVisible,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search...',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                    searchTerm= _searchController.text;
+                    // Handle search query changes
+                    });
+                  },
+                ),
+              ),
+            ),
             _buildStatusList(TODO, Icons.menu, Color(0xff4e3169)),
             _buildStatusList(DOING, Icons.flag, Colors.orange),
             _buildStatusList(DONE, Icons.done, Colors.green),
           ],
-        ),
+    ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -423,7 +450,7 @@ class _ToDoListPageState extends State<ToDoListPage> {
             data: item,
             feedback: ToDoItemCard(item),
             childWhenDragging: Container(),
-            child: ToDoItemCard(item),
+            child: ToDoItemCard(item, searchTerm: _searchController.text),
             onDragStarted: () {
               fixid =item.id;
               start=true;
@@ -529,11 +556,16 @@ class ToDoItem {
 
 class ToDoItemCard extends StatelessWidget {
   final ToDoItem item;
+  final String? searchTerm;
 
-  ToDoItemCard(this.item);
+  ToDoItemCard(this.item, {this.searchTerm});
+  //ToDoItemCard(this.item);
+
+  //get searchTerm => null;
 
   @override
   Widget build(BuildContext context) {
+    print("searchtrmnn $searchTerm");
     TextEditingController tittleController = TextEditingController(text: item.title);
     TextEditingController categoryController = TextEditingController(text: item.category);
     TextEditingController dueDateController = TextEditingController(text: DateFormat('yyyy-MM-dd').format(item.dueDate));
@@ -556,7 +588,8 @@ class ToDoItemCard extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.only(left: 12.0),
                 ),
-                Text(tittleController.text, style: TextStyle(fontSize: 20.0, color: Colors.white)),
+                Text(tittleController.text, style: TextStyle(fontSize: 20.0, color: Colors.white ,
+                  backgroundColor: searchTerm != null && item.title.contains(searchTerm!) && searchTerm!= ""?Colors.yellow: Colors.transparent,)),//lsa lvisibl w bs ektob d8ri y3rf
               ],
             ),
             SizedBox(height: 1.0),
@@ -571,6 +604,10 @@ class ToDoItemCard extends StatelessWidget {
                       border: InputBorder.none, // Make the underline invisible
                       hintText: 'Enter category', // Placeholder text
                     ),
+                    onChanged: (newCategory) async {
+                      item.category = newCategory;
+                      await DatabaseHelper.updateTodoItem(item.toMap());
+                    },
                   ),
                 ),
               ],
@@ -587,6 +624,11 @@ class ToDoItemCard extends StatelessWidget {
                       border: InputBorder.none, // Make the underline invisible
                       hintText: 'due date', // Placeholder text
                     ),
+                    onChanged: (duedate) async{
+                      if(DateTime.tryParse(duedate)!=null){
+                      item.dueDate = DateTime.parse(duedate) ;
+                      await DatabaseHelper.updateTodoItem(item.toMap());}
+                    },
                   ),
                 ),
               ],
@@ -603,6 +645,12 @@ class ToDoItemCard extends StatelessWidget {
                       border: InputBorder.none, // Make the underline invisible
                       hintText: 'Enter effort', // Placeholder text
                     ),
+                    onChanged: (estimate) async{
+                      if(int.tryParse(estimate)!=null){
+                      item.estimate = estimate;
+                      await DatabaseHelper.updateTodoItem(item.toMap());
+                      }
+                    },
                   ),
                 ),
               ],
@@ -626,6 +674,17 @@ class ToDoItemCard extends StatelessWidget {
         ),
       ),
     );
+  }
+  Color _getHighlightColor(String title, String searchTerm) {
+    final lowerCaseTitle = title.toLowerCase();
+    final lowerCaseSearchTerm = searchTerm.toLowerCase();
+    final startIndex = lowerCaseTitle.indexOf(lowerCaseSearchTerm);
+    final endIndex = startIndex + searchTerm.length;
+    if (startIndex != -1) {
+      return Colors.yellow;
+    } else {
+      return Colors.transparent;
+    }
   }
 
   Color getButtonColor(String importance) {
